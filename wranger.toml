@@ -1,7 +1,0 @@
-name = "bayar-izul"
-main = "worker.js"
-compatibility_date = "2026-04-20"
-
-[[kv_namespaces]]
-binding = "DB"
-id = "117cbce7299b42688ea9038f21064927"
