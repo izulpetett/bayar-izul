@@ -1,40 +1,82 @@
 export default {
   async fetch(request, env, ctx) {
+    const corsHeaders = {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type",
+      "Content-Type": "application/json"
+    };
+
     if (request.method === "OPTIONS") {
-      return new Response(null, { headers: { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Methods": "POST, OPTIONS", "Access-Control-Allow-Headers": "Content-Type" } });
+      return new Response(null, { headers: corsHeaders });
     }
 
-    if (new URL(request.url).pathname === "/create-payment" && request.method === "POST") {
-      const body = await request.json();
-      const { produk, harga } = body;
-      const order_id = "IZUL-" + Date.now();
-      
-      const res = await fetch("https://api.bayar.gg/api/create-payment", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          api_key: env.BAYAR_API_KEY,
-          order_id: order_id,
-          amount: harga,
-          product_name: produk,
-          customer_name: "Guest", // bayar.gg wajib ada, kita isi Guest
-          customer_email: order_id + "@izulstore.com",
-          customer_phone: "62800000" // wajib ada, isi dummy
-        })
-      });
+    const url = new URL(request.url);
+    const API_KEY = env.BAYAR_API_KEY;
+    const NO_WA_ADMIN = env.WA_ADMIN;
 
-      const data = await res.json();
-      return new Response(JSON.stringify(data), { 
-        headers: { "Access-Control-Allow-Origin": "*", "Content-Type": "application/json" } 
-      });
-    }
-    return new Response("Worker jalan", { headers: { "Access-Control-Allow-Origin": "*" } });
-  }
-}          })
+    // 1. ENDPOINT: BUAT PAYMENT
+    if (url.pathname === "/create-payment.php" && request.method === "POST") {
+      try {
+        const body = await request.json();
+        const { produk, harga, wa_pembeli } = body;
+        const order_id = "IZUL-" + Date.now();
+        
+        const res = await fetch("https://api.bayar.gg/api/create-payment.php", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            api_key: API_KEY,
+            order_id: order_id,
+            amount: harga,
+            product_name: produk,
+            customer_name: "Guest",
+            customer_email: order_id + "@izulstore.com",
+            customer_phone: wa_pembeli || "62800000"
+          })
         });
+
         const data = await res.json();
         
         if(data.status !== "success"){
+          return new Response(JSON.stringify({error: data.message}), { status: 400, headers: corsHeaders });
+        }
+
+        // SIMPAN KE KV
+        await env.DB.put(order_id, JSON.stringify({produk, wa_pembeli, harga}));
+        
+        return new Response(JSON.stringify({
+          status: "success",
+          payment_url: data.data.payment_url,
+          order_id: order_id
+        }), { headers: corsHeaders });
+
+      } catch(e) {
+        return new Response(JSON.stringify({error: e.message}), { status: 500, headers: corsHeaders });
+      }
+    }
+
+    // 2. ENDPOINT: TERIMA WEBHOOK LUNAS
+    if (url.pathname === "/webhook" && request.method === "POST") {
+      const body = await request.json();
+      console.log("Webhook:", body);
+
+      if (body.status === "PAID" || body.status === "LUNAS") {
+        const orderData = await env.DB.get(body.order_id);
+        if (orderData) {
+          const {produk, wa_pembeli, harga} = JSON.parse(orderData);
+          
+          // Notif ke admin
+          await fetch(`https://api.bayar.gg/api/send-whatsapp?api_key=${API_KEY}&to=${NO_WA_ADMIN}&message=Order%20Lunas:%20${body.order_id}`);
+        }
+        await env.DB.delete(body.order_id);
+      }
+      return new Response(JSON.stringify({status: "OK"}), { headers: corsHeaders });
+    }
+
+    return new Response("Worker Izul Ztore Jalan", { status: 200, headers: corsHeaders });
+  }
+}        if(data.status !== "success"){
           return new Response(JSON.stringify({error: data.message}), { status: 400, headers: corsHeaders });
         }
 
