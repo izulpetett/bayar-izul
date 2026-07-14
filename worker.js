@@ -1,40 +1,36 @@
 export default {
   async fetch(request, env, ctx) {
-    const url = new URL(request.url);
-    
-    // 1. SETTING RAHASIA - ISI DI CLOUDFLARE SECRETS
-    const API_KEY = env.BAYAR_API_KEY;
-    const NO_WA_ADMIN = "6289503336000"; // GANTI NOMOR KAMU
-
-    // 2. CORS BIAR WEB KAMU BISA AKSES
-    const corsHeaders = {
-      "Access-Control-Allow-Origin": "https://izul-store.my.id", // GANTI KALO DOMAIN GANTI
-      "Access-Control-Allow-Methods": "POST, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type",
-    };
     if (request.method === "OPTIONS") {
-      return new Response(null, { headers: corsHeaders });
+      return new Response(null, { headers: { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Methods": "POST, OPTIONS", "Access-Control-Allow-Headers": "Content-Type" } });
     }
 
-    // 3. ENDPOINT: BIKIN INVOICE BAYAR.GG
-    if (url.pathname === "/create-payment" && request.method === "POST") {
-      try {
-        const body = await request.json();
-        const { produk, harga, nama_pembeli, wa_pembeli } = body;
+    if (new URL(request.url).pathname === "/create-payment" && request.method === "POST") {
+      const body = await request.json();
+      const { produk, harga } = body;
+      const order_id = "IZUL-" + Date.now();
+      
+      const res = await fetch("https://api.bayar.gg/api/create-payment", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          api_key: env.BAYAR_API_KEY,
+          order_id: order_id,
+          amount: harga,
+          product_name: produk,
+          customer_name: "Guest", // bayar.gg wajib ada, kita isi Guest
+          customer_email: order_id + "@izulstore.com",
+          customer_phone: "62800000" // wajib ada, isi dummy
+        })
+      });
 
-        const order_id = "IZUL-" + Date.now();
-        
-        const res = await fetch("https://api.bayar.gg/api/create-payment", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            api_key: API_KEY,
-            order_id: order_id,
-            amount: harga,
-            product_name: produk,
-            customer_name: nama_pembeli,
-            customer_email: wa_pembeli + "@izulstore.com"
-          })
+      const data = await res.json();
+      return new Response(JSON.stringify(data), { 
+        headers: { "Access-Control-Allow-Origin": "*", "Content-Type": "application/json" } 
+      });
+    }
+    return new Response("Worker jalan", { headers: { "Access-Control-Allow-Origin": "*" } });
+  }
+}          })
         });
         const data = await res.json();
         
