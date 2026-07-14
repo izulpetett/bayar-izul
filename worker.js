@@ -56,6 +56,28 @@ export default {
 
     return new Response("Worker Izul Ztore Jalan", { status: 200, headers: corsHeaders });
   }
+    }        return new Response(JSON.stringify({status: "success", payment_url: data.data.payment_url, order_id: order_id}), { headers: corsHeaders });
+
+      } catch(e) {
+        return new Response(JSON.stringify({error: e.message}), { status: 500, headers: corsHeaders });
+      }
+    }
+
+    if (url.pathname === "/webhook" && request.method === "POST") {
+      const body = await request.json();
+      if (body.status === "PAID" || body.status === "LUNAS") {
+        const orderData = await env.DB.get(body.order_id);
+        if (orderData) {
+          const {produk, wa_pembeli, harga} = JSON.parse(orderData);
+          await fetch(`https://api.bayar.gg/api/send-whatsapp?api_key=${API_KEY}&to=${NO_WA_ADMIN}&message=Order%20Lunas:%20${body.order_id}`);
+        }
+        await env.DB.delete(body.order_id);
+      }
+      return new Response(JSON.stringify({status: "OK"}), { headers: corsHeaders });
+    }
+
+    return new Response("Worker Izul Ztore Jalan", { status: 200, headers: corsHeaders });
+  }
 }        });
 
         const data = await res.json();
