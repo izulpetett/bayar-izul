@@ -3,7 +3,7 @@ export default {
     const url = new URL(request.url);
     
     // 1. SETTING RAHASIA - ISI DI CLOUDFLARE SECRETS
-    const API_KEY = env.BAYAR.API.KEY;
+    const API_KEY = env.BAYAR_API_KEY;
     const NO_WA_ADMIN = "6289503336000"; // GANTI NOMOR KAMU
 
     // 2. CORS BIAR WEB KAMU BISA AKSES
